@@ -1,0 +1,84 @@
+---
+- name: Full setup for SIS2, SIS3, SIS4
+  hosts: oep
+  become: yes
+
+  vars_files:
+    - group_vars/oep.yml
+
+  tasks:
+    - name: Ensure application group exists
+      ansible.builtin.group:
+        name: "{{ app_group }}"
+        state: present
+
+    - name: Ensure application user exists
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        group: "{{ app_group }}"
+        create_home: yes
+        shell: /bin/bash
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0755'
+
+    - name: Create exams directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}/exams"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0750'
+
+    - name: Ensure automation user exists
+      ansible.builtin.user:
+        name: ansible
+        groups: sudo
+        append: yes
+        create_home: yes
+        shell: /bin/bash
+
+    - name: Allow ansible user sudo without password
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/ansible
+        content: "ansible ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+        validate: 'visudo -cf %s'
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install system packages
+      ansible.builtin.apt:
+        name:
+          - nginx
+          - postgresql
+          - docker.io
+          - ansible
+          - ufw
+          - curl
+          - python3-pip
+        state: present
+
+    - name: Install Python packages
+      ansible.builtin.pip:
+        name:
+          - django
+          - psycopg2-binary
+          - gunicorn
+        executable: pip3
+
+    - name: Ensure docker service is enabled and running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: yes
+

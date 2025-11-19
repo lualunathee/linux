@@ -1,0 +1,8 @@
+app_user: oepapp
+app_group: oepapp
+app_dir: /opt/oep-app
+venv_dir: /opt/oep-app/venv
+backup_scripts_dir: /home/{{ app_user }}/projects/working-with-services/scripts
+backup_dest_dir: /opt/backups
+docker_container_name: oep_app
+docker_image: nginx:latest
