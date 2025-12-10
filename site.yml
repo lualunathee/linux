@@ -1,4 +1,6 @@
 ---
+- import_playbook: playbooks/journaling.yml
+
 - name: Full setup for SIS2, SIS3, SIS4
   hosts: oep
   become: yes

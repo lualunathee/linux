@@ -1,0 +1,85 @@
+---
+- name: Configure journalling and audit on OEP hosts
+  hosts: all
+  become: yes
+  vars:
+    journald_conf:
+      Compress: yes
+      Seal: yes
+
+  tasks:
+    - name: Install required packages
+      package:
+        name:
+          - auditd
+          - audispd-plugins
+          - rsyslog
+        state: present
+
+    - name: Deploy journald remote config (if central_logging_host defined)
+      copy:
+        src: 10-remote.conf
+        dest: /etc/systemd/journald.d/10-remote.conf
+        owner: root
+        group: root
+        mode: '0644'
+      when: central_logging_host is defined and central_logging_host != ''
+      notify: restart systemd-journald
+
+    - name: Deploy custom journald overrides
+      copy:
+        src: 99-journald.conf
+        dest: /etc/systemd/journald.conf.d/99-custom.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart systemd-journald
+
+    - name: Configure rsyslog client to forward logs to central logging (if set)
+      copy:
+        dest: /etc/rsyslog.d/90-forward.conf
+        content: |
+          *.* @@{{ central_logging_host }}:514
+        owner: root
+        group: root
+        mode: '0644'
+      when: central_logging_host is defined and central_logging_host != ''
+      notify: restart rsyslog
+
+    - name: Deploy journal helper scripts
+      copy:
+        src: "{{ item }}"
+        dest: "/usr/local/bin/{{ item | basename | regex_replace('.sh$', '') }}.sh"
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - journal_watch.sh
+        - journal_filter_service.sh
+        - export_journal.sh
+
+    - name: Deploy audit rule for sudoers
+      copy:
+        src: audit-sudoers.rules
+        dest: /etc/audit/rules.d/99-sudoers.rules
+        owner: root
+        group: root
+        mode: '0640'
+      notify: reload auditd
+
+  handlers:
+    - name: restart rsyslog
+      service:
+        name: rsyslog
+        state: restarted
+
+    - name: reload auditd
+      service:
+        name: auditd
+        state: restarted
+
+    - name: restart systemd-journald
+      systemd:
+        name: systemd-journald
+        state: restarted
+        daemon_reload: yes
